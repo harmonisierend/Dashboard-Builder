@@ -9,8 +9,12 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from dashboard_studio.api import routes_registry, routes_status
+from dashboard_studio.api import routes_design, routes_registry, routes_status
 from dashboard_studio.config import get_settings
+from dashboard_studio.db.migrate import run_migrations
+from dashboard_studio.db.session import make_engine, make_session_factory
+from dashboard_studio.design.anthropic_client import AnthropicDesignClient
+from dashboard_studio.design.uploads import DesignUploadStore
 from dashboard_studio.ha.auth import HAConfigError, resolve_ha_connection
 from dashboard_studio.ha.ws_client import HAWebSocketClient
 from dashboard_studio.logging import configure_logging
@@ -28,6 +32,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
 
+    # DB/Anthropic/upload init happens before the HA-connection block below
+    # and unconditionally: design-token analysis has nothing to do with HA
+    # reachability, so a broken/unconfigured HA connection must not make
+    # /api/design/* permanently 503.
+    run_migrations()
+    engine = make_engine(settings.data_dir)
+    app.state.db_engine = engine
+    app.state.db_session_factory = make_session_factory(engine)
+    app.state.anthropic_client = AnthropicDesignClient(settings)
+    app.state.upload_store = DesignUploadStore(settings.data_dir)
+
     try:
         connection = resolve_ha_connection(settings)
     except HAConfigError as exc:
@@ -37,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # until the App options are fixed.
         log.error("Cannot resolve Home Assistant connection: %s", exc)
         yield
+        await engine.dispose()
         return
 
     client = HAWebSocketClient(connection)
@@ -58,6 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     if client.connected:
         await client.close()
+    await engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -66,6 +83,7 @@ def create_app() -> FastAPI:
 
     app.include_router(routes_status.router)
     app.include_router(routes_registry.router)
+    app.include_router(routes_design.router)
 
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

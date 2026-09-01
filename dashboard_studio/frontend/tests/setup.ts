@@ -20,3 +20,16 @@ Object.defineProperties(HTMLElement.prototype, {
   clientHeight: { configurable: true, value: 600 },
   clientWidth: { configurable: true, value: 800 },
 });
+
+// jsdom's own URL.createObjectURL produces a real-looking but unstable
+// "blob:nodedata:<uuid>" string. ImageUpload/DesignPage call it to preview
+// an upload; component tests want a stable, predictable value instead, so
+// this always overrides it (not just when absent).
+Object.defineProperty(URL, "createObjectURL", {
+  configurable: true,
+  value: () => "blob:mock-url",
+});
+Object.defineProperty(URL, "revokeObjectURL", {
+  configurable: true,
+  value: () => {},
+});

@@ -10,19 +10,21 @@ desktop, and wall-panel devices.
 The app runs entirely inside your own Home Assistant instance (Ingress-only,
 no exposed port) and stores everything locally under `/data`. The only
 external call is to the Anthropic API for design analysis and dashboard
-generation (from Milestone 2 onward), configured with your own API key.
+generation, configured with your own API key.
 
-## Status: Milestone 1
+## Status: Milestone 2
 
-This repository currently implements **Milestone 1**: the app skeleton,
-Ingress panel, a connection to Home Assistant's WebSocket API, and a
-searchable/filterable snapshot of your entity registry in the UI. See
-[`dashboard_studio/CHANGELOG.md`](dashboard_studio/CHANGELOG.md) for what's
-implemented and [`dashboard_studio/DOCS.md`](dashboard_studio/DOCS.md) for
-user-facing documentation.
+This repository currently implements **Milestones 1–2**: the app skeleton,
+Ingress panel, a connection to Home Assistant's WebSocket API, a
+searchable/filterable snapshot of your entity registry, and design-token
+analysis from an uploaded reference image (color palette, typography, form,
+density, card-style classification) with an editor, savable presets, and
+HA-theme export. See [`dashboard_studio/CHANGELOG.md`](dashboard_studio/CHANGELOG.md)
+for what's implemented and [`dashboard_studio/DOCS.md`](dashboard_studio/DOCS.md)
+for user-facing documentation.
 
-Design analysis, dashboard generation, entity curation, live preview, and
-writing dashboards back into Home Assistant are later milestones (M2–M7).
+Dashboard generation, entity curation, live preview, and writing dashboards
+back into Home Assistant are later milestones (M3–M7).
 
 ## Repository layout
 
@@ -55,6 +57,9 @@ pip install -e ".[dev]"
 export DASHBOARD_STUDIO_DATA_DIR=./.data
 export DASHBOARD_STUDIO_LONG_LIVED_TOKEN=<a long-lived access token>
 export DASHBOARD_STUDIO_HA_URL=http://homeassistant.local:8123
+
+# To exercise the Design page's image analysis locally:
+export DASHBOARD_STUDIO_ANTHROPIC_API_KEY=<your Anthropic API key>
 
 cd src && python -m uvicorn dashboard_studio.main:app --reload --port 8099
 ```
@@ -100,9 +105,10 @@ npm run build
 2. Start the app and open it via the **Dashboard Studio** panel in the
    sidebar.
 
-No configuration is required yet for Milestone 1 — see
+Set `anthropic_api_key` in the app's options to use the Design page's image
+analysis; everything else works without configuration. See
 [`dashboard_studio/DOCS.md`](dashboard_studio/DOCS.md) for the full option
-reference (relevant starting Milestone 2).
+reference.
 
 ## CI
 

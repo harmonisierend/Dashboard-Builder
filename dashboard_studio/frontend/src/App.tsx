@@ -2,6 +2,7 @@ import { HashRouter, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { EntityTable } from "./components/registry/EntityTable";
 import { useRegistrySnapshot } from "./hooks/useRegistrySnapshot";
+import { DesignPage } from "./pages/DesignPage";
 
 function RegistryPage() {
   const { data, loading, error, refresh } = useRegistrySnapshot();
@@ -40,6 +41,7 @@ export function App() {
       <AppShell>
         <Routes>
           <Route path="/" element={<RegistryPage />} />
+          <Route path="/design" element={<DesignPage />} />
         </Routes>
       </AppShell>
     </HashRouter>

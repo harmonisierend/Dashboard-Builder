@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -53,6 +53,10 @@ class TokenPreset(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
     name: Mapped[str] = mapped_column(String(255))
     token_json: Mapped[str] = mapped_column(Text)
+    # Queryable separately from the JSON blob so a future migration can
+    # branch on it (SELECT ... WHERE token_schema_version = ...) instead of
+    # parsing every row's token_json to find out what shape it's in.
+    token_schema_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 

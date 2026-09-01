@@ -88,6 +88,114 @@ export interface RegistryResponse {
   lovelace_resources: LovelaceResource[];
 }
 
+// -- Design tokens (Milestone 2) --------------------------------------
+
+export interface ColorPair {
+  light: string;
+  dark: string;
+}
+
+export interface ColorPalette {
+  primary: ColorPair;
+  accent: ColorPair;
+  background: ColorPair;
+  surface: ColorPair;
+  on_surface: ColorPair;
+  state_on: ColorPair;
+  state_off: ColorPair;
+  warn: ColorPair;
+  critical: ColorPair;
+}
+
+export interface FontSizeScale {
+  xs: string;
+  sm: string;
+  md: string;
+  lg: string;
+  xl: string;
+}
+
+export interface FontWeights {
+  regular: number;
+  medium: number;
+  bold: number;
+}
+
+export interface Typography {
+  font_family: string;
+  sizes: FontSizeScale;
+  weights: FontWeights;
+}
+
+export type StyleFamily = "glass" | "flat" | "neumorphic";
+
+export interface Form {
+  border_radius_px: number;
+  shadow: string;
+  border_width_px: number;
+  style_family: StyleFamily;
+}
+
+export type DensityMode = "compact" | "comfortable";
+
+export interface Density {
+  mode: DensityMode;
+  grid_gap_px: number;
+  section_spacing_px: number;
+}
+
+export interface CardStyleClassification {
+  primary_style: string;
+  reasoning: string;
+}
+
+export interface DesignTokenSet {
+  schema_version: number;
+  colors: ColorPalette;
+  typography: Typography;
+  form: Form;
+  density: Density;
+  card_style: CardStyleClassification;
+}
+
+export interface UploadResponse {
+  upload_id: string;
+  media_type: string;
+  size_bytes: number;
+}
+
+export interface UsageInfo {
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost_usd: number | null;
+  model: string;
+}
+
+export interface AnalyzeResponse {
+  tokens: DesignTokenSet;
+  usage: UsageInfo;
+}
+
+export interface TokenPresetSummary {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface TokenPresetDetail {
+  id: string;
+  name: string;
+  created_at: string;
+  tokens: DesignTokenSet;
+}
+
+export interface ThemeExportResponse {
+  filename: string;
+  yaml: string;
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
 export const api = {
   getStatus: (): Promise<StatusResponse> => request<StatusResponse>("api/status"),
   getRegistry: (includeDiagnostic = false): Promise<RegistryResponse> =>
@@ -95,5 +203,35 @@ export const api = {
   refreshRegistry: (includeDiagnostic = false): Promise<RegistryResponse> =>
     request<RegistryResponse>(`api/registry/refresh?include_diagnostic=${includeDiagnostic}`, {
       method: "POST",
+    }),
+
+  uploadDesignImage: (file: File): Promise<UploadResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<UploadResponse>("api/design/upload", { method: "POST", body: form });
+  },
+  analyzeDesign: (uploadId: string): Promise<AnalyzeResponse> =>
+    request<AnalyzeResponse>("api/design/analyze", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ upload_id: uploadId }),
+    }),
+  listTokenPresets: (): Promise<TokenPresetSummary[]> =>
+    request<TokenPresetSummary[]>("api/design/presets"),
+  getTokenPreset: (id: string): Promise<TokenPresetDetail> =>
+    request<TokenPresetDetail>(`api/design/presets/${id}`),
+  saveTokenPreset: (name: string, tokens: DesignTokenSet): Promise<TokenPresetDetail> =>
+    request<TokenPresetDetail>("api/design/presets", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ name, tokens }),
+    }),
+  deleteTokenPreset: (id: string): Promise<{ deleted: boolean }> =>
+    request<{ deleted: boolean }>(`api/design/presets/${id}`, { method: "DELETE" }),
+  exportThemeYaml: (themeName: string, tokens: DesignTokenSet): Promise<ThemeExportResponse> =>
+    request<ThemeExportResponse>("api/design/theme-export", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ theme_name: themeName, tokens }),
     }),
 };

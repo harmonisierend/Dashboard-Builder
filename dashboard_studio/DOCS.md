@@ -5,17 +5,18 @@ upload) and your real entity/device/area inventory, so you can accept or
 reject each view, section, card, color, and layout decision individually
 before anything is written to Home Assistant.
 
-This is Milestone 1: the App skeleton, the connection to Home Assistant's
-WebSocket API, and a searchable, filterable snapshot of your entity
-registry. Design analysis, dashboard generation, and writing a dashboard
-into Home Assistant come in later milestones.
+This is through Milestone 2: the App skeleton, the connection to Home
+Assistant's WebSocket API, a searchable/filterable snapshot of your entity
+registry, and design-token analysis from an uploaded reference image.
+Dashboard generation and writing a dashboard into Home Assistant come in
+later milestones.
 
 ## Installation
 
 1. In Home Assistant, go to **Settings → Apps → App Store**, add this
    repository, then install "HA Dashboard Studio".
-2. Start the app. No configuration is required for Milestone 1 — the
-   Anthropic API key and model become relevant starting in Milestone 2.
+2. To use the Design page, set `anthropic_api_key` in the app's options
+   (see below). Everything else works without configuration.
 3. Open the app via the **Dashboard Studio** panel in the sidebar.
 
 ## Configuration
@@ -23,8 +24,8 @@ into Home Assistant come in later milestones.
 | Option | Description |
 | --- | --- |
 | `log_level` | Verbosity of the app's log output (`debug`/`info`/`warning`/`error`). |
-| `anthropic_api_key` | Your Anthropic API key. Used server-side only, starting in Milestone 2. Never exposed to the frontend or logged. |
-| `anthropic_model` | The Anthropic model used for design analysis and dashboard generation (default: `claude-sonnet-5`). Not used yet in Milestone 1. |
+| `anthropic_api_key` | Your Anthropic API key, required to use the Design page's image analysis. Used server-side only. Never exposed to the frontend or logged. |
+| `anthropic_model` | The Anthropic model used for design analysis (default: `claude-sonnet-5`). |
 | `long_lived_token` | Only needed for local development outside the Supervisor sandbox. Leave empty in a normal installation — the Supervisor-provided token is used automatically. |
 
 ## What Milestone 1 does
@@ -43,6 +44,28 @@ into Home Assistant come in later milestones.
   by default but can be toggled back on; entities that are unavailable or
   in an unknown state are flagged, never silently dropped.
 
+## What Milestone 2 does
+
+- Lets you upload a design-reference image (PNG/JPEG/WebP, up to 6 MB) on
+  the **Design** page.
+- Sends it to the Anthropic API (your configured model, default
+  `claude-sonnet-5`) to derive a design-token set: a color palette (with
+  separate light and dark variants), typography, corner/border/shadow
+  style, spacing density, and a card-style classification.
+- **The reference is used only to derive abstract design characteristics —
+  colors, spacing, density, style direction. It is never reproduced
+  layout-for-layout, and no copyrighted content from it is copied.** This
+  notice is also shown in the UI next to the upload area.
+- Lets you review and adjust every token by hand (color pickers, sliders,
+  text fields) before using it anywhere.
+- Lets you save a token set as a named, reusable preset, and load or delete
+  saved presets later.
+- Lets you export the current token set as an HA-compatible `themes.yaml`
+  snippet. Home Assistant needs a theme reload after you add it for the
+  change to take effect.
+- Logs the Anthropic token usage and an estimated cost for every analysis
+  call (there's no hard spending cap — this is informational).
+
 ## What this app does not do
 
 - It never modifies an existing dashboard without your explicit
@@ -54,8 +77,8 @@ into Home Assistant come in later milestones.
   HACS-installed component you don't have, it tells you and offers a
   native-card fallback instead.
 - Nothing about your dashboard, entities, or design references leaves your
-  Home Assistant instance except the design-analysis and dashboard-
-  generation calls to the Anthropic API (from Milestone 2 onward).
+  Home Assistant instance except the design-analysis calls to the
+  Anthropic API (and dashboard-generation calls, from Milestone 3 onward).
 
 ## Support
 
