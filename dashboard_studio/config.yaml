@@ -1,0 +1,27 @@
+name: "HA Dashboard Studio"
+version: "0.1.0"
+slug: "dashboard_studio"
+description: "Generate Lovelace dashboard proposals from a design reference and your entity inventory."
+url: "https://github.com/harmonisierend/Dashboard-Builder"
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:view-dashboard-variant
+panel_title: "Dashboard Studio"
+homeassistant_api: true
+backup: hot
+options:
+  log_level: "info"
+  anthropic_api_key: ""
+  anthropic_model: "claude-sonnet-5"
+  long_lived_token: ""
+schema:
+  log_level: "list(debug|info|warning|error)"
+  anthropic_api_key: "password"
+  anthropic_model: "str"
+  long_lived_token: "password?"

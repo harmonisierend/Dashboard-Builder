@@ -1,0 +1,21 @@
+configuration:
+  log_level:
+    name: Log level
+    description: Verbosity of the app's log output.
+  anthropic_api_key:
+    name: Anthropic API key
+    description: >-
+      Your Anthropic API key. Used server-side only, for the design-analysis
+      (vision) and dashboard-generation (text) calls starting in Milestone 2.
+      Never sent to or stored in the frontend, and never logged.
+  anthropic_model:
+    name: Anthropic model
+    description: >-
+      The Anthropic model used for vision and text generation calls
+      (e.g. claude-sonnet-5). Not used yet in Milestone 1.
+  long_lived_token:
+    name: Long-lived access token (local development only)
+    description: >-
+      Only needed when running this app outside the Supervisor sandbox for
+      local development. Inside the real app container, Supervisor injects
+      SUPERVISOR_TOKEN automatically and this should stay empty.
