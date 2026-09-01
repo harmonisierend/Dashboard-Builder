@@ -239,7 +239,7 @@ export interface GeneratedDashboard {
 
 export type GenerationStrategy = "by_area" | "by_domain" | "automatic";
 
-export interface GenerateDashboardRequest {
+export interface DashboardScopeRequest {
   area_ids?: string[];
   floor_ids?: string[];
   strategy: GenerationStrategy;
@@ -263,6 +263,50 @@ export interface DashboardUsageInfo {
   estimated_cost_usd: number | null;
   model: string;
   call_count: number;
+}
+
+// -- Per-entity curation (Milestone 4) ----------------------------------
+
+export interface CandidateEntitySummary {
+  entity_id: string;
+  domain: string;
+  name: string;
+  area_name: string | null;
+  device_class: string | null;
+}
+
+export interface StyleHint {
+  density_mode: DensityMode;
+  card_style: string;
+  style_family: StyleFamily;
+}
+
+export interface ProposedView {
+  name: string;
+  candidates: CandidateEntitySummary[];
+}
+
+export interface ProposeStructureResponse {
+  proposed_views: ProposedView[];
+  available_custom_cards: Record<string, Record<string, string>>;
+  style_hint: StyleHint | null;
+  usage: DashboardUsageInfo;
+  notes: string[];
+}
+
+export interface CuratedViewRequest {
+  name: string;
+  candidates: CandidateEntitySummary[];
+}
+
+export interface GenerateDashboardRequest {
+  area_ids?: string[];
+  floor_ids?: string[];
+  include_diagnostic?: boolean;
+  curated_views: CuratedViewRequest[];
+  available_custom_cards: Record<string, Record<string, string>>;
+  style_hint?: StyleHint | null;
+  phase1_usage: DashboardUsageInfo;
 }
 
 export interface GenerateDashboardResponse {
@@ -314,6 +358,12 @@ export const api = {
       body: JSON.stringify({ theme_name: themeName, tokens }),
     }),
 
+  proposeDashboardStructure: (body: DashboardScopeRequest): Promise<ProposeStructureResponse> =>
+    request<ProposeStructureResponse>("api/dashboard/propose-structure", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    }),
   generateDashboard: (body: GenerateDashboardRequest): Promise<GenerateDashboardResponse> =>
     request<GenerateDashboardResponse>("api/dashboard/generate", {
       method: "POST",

@@ -1,11 +1,22 @@
-"""Orchestrates the two-phase dashboard generation call and the mandatory
+"""Orchestrates the two-phase dashboard generation flow and the mandatory
 entity-ID / custom-card-type validation gate.
 
-Phase 1 (structure) errors propagate to the caller unchanged -- there is no
-dashboard to build at all if that call fails. Phase 2 (per-view card
-generation) failures are isolated per view: a transient failure generating
-one view's cards must not void the whole response, so each is caught,
-logged, and turned into a user-facing note instead.
+Split at the curation seam (Milestone 4): `propose_structure()` runs phase 1
+(structure proposal) and resolves each proposed view's candidate entities,
+stopping short of spending any phase-2 LLM calls -- the caller curates
+which views/entities survive before `generate_from_curated_views()` spends
+anything on phase 2. Phase 1 errors propagate to the caller unchanged --
+there is no dashboard to build at all if that call fails. Phase 2
+(per-view card generation) failures are isolated per view: a transient
+failure generating one view's cards must not void the whole response, so
+each is caught, logged, and turned into a user-facing note instead.
+
+This app stays stateless end to end (no M1-M3 milestone introduced
+server-side session state, and M4 doesn't either): the caller is expected
+to hold a `StructureProposalOutcome` in memory (or echo it back over the
+wire, as `api/routes_dashboard.py` does), apply curation to its
+`proposed_views`, and pass the curated subset straight into
+`generate_from_curated_views()`.
 """
 
 from __future__ import annotations
@@ -18,6 +29,7 @@ from dashboard_studio.dashboard.config import (
     GeneratedDashboard,
     GenerationStrategy,
     SectionsView,
+    StyleHint,
     to_style_hint,
 )
 from dashboard_studio.dashboard.custom_cards import (
@@ -32,7 +44,7 @@ from dashboard_studio.dashboard.generation_client import (
 )
 from dashboard_studio.dashboard.scope import (
     MAX_PROPOSED_VIEWS,
-    ViewProposal,
+    CandidateEntitySummary,
     resolve_view_entities,
     summarize_scope,
     to_candidate_summary,
@@ -54,6 +66,40 @@ class GenerationUsageTotals:
     call_count: int
 
 
+def combine_usage_totals(
+    phase1: GenerationUsageTotals, phase2: GenerationUsageTotals
+) -> GenerationUsageTotals:
+    """`model` is always taken from `phase1` -- that call always happens
+    exactly once and always has a real model name, whereas phase 2 can
+    legitimately make zero calls (every curated view skipped/emptied out).
+    """
+    cost_known = phase1.estimated_cost_usd is not None and phase2.estimated_cost_usd is not None
+    return GenerationUsageTotals(
+        input_tokens=phase1.input_tokens + phase2.input_tokens,
+        output_tokens=phase1.output_tokens + phase2.output_tokens,
+        estimated_cost_usd=(
+            (phase1.estimated_cost_usd or 0.0) + (phase2.estimated_cost_usd or 0.0) if cost_known else None
+        ),
+        model=phase1.model,
+        call_count=phase1.call_count + phase2.call_count,
+    )
+
+
+@dataclass
+class ProposedView:
+    name: str
+    candidates: list[CandidateEntitySummary]
+
+
+@dataclass
+class StructureProposalOutcome:
+    proposed_views: list[ProposedView]
+    available_custom_cards: dict[str, dict[str, str]]
+    style_hint: StyleHint | None
+    usage: GenerationUsageTotals
+    notes: list[str]
+
+
 @dataclass
 class DashboardGenerationOutcome:
     dashboard: GeneratedDashboard
@@ -62,20 +108,18 @@ class DashboardGenerationOutcome:
     notes: list[str]
 
 
-async def generate_dashboard(
+async def propose_structure(
     *,
     client: DashboardGenerationClient,
     scoped_entities: list[EntityRecord],
     lovelace_resources: list[LovelaceResource],
     strategy: GenerationStrategy,
     tokens: DesignTokenSet | None,
-    max_concurrent_view_calls: int = 3,
-) -> DashboardGenerationOutcome:
+) -> StructureProposalOutcome:
     notes: list[str] = []
 
     families = detect_installed_custom_card_families(lovelace_resources)
     available = available_custom_cards(families)
-    allowed_types = allowed_custom_type_strings(available)
     for family in sorted(families - set(available)):
         notes.append(
             f"Erkannte Ressource '{family}' stellt keinen eigenen Kartentyp bereit "
@@ -92,43 +136,82 @@ async def generate_dashboard(
         raise DashboardGenerationUpstreamError("Es konnten keine Ansichten vorgeschlagen werden.")
 
     if len(proposals) > MAX_PROPOSED_VIEWS:
-        notes.append(
-            f"{len(proposals)} Ansichten vorgeschlagen, auf {MAX_PROPOSED_VIEWS} begrenzt."
-        )
+        notes.append(f"{len(proposals)} Ansichten vorgeschlagen, auf {MAX_PROPOSED_VIEWS} begrenzt.")
         proposals = proposals[:MAX_PROPOSED_VIEWS]
 
-    semaphore = asyncio.Semaphore(max_concurrent_view_calls)
-    active_proposals: list[ViewProposal] = []
-    tasks = []
+    proposed_views: list[ProposedView] = []
     for proposal in proposals:
         candidates = resolve_view_entities(scoped_entities, proposal.selector)
         if not candidates:
-            notes.append(
-                f"Ansicht '{proposal.name}' übersprungen: keine passenden Entitäten im Scope."
-            )
+            notes.append(f"Ansicht '{proposal.name}' übersprungen: keine passenden Entitäten im Scope.")
             continue
-        candidate_summaries = [to_candidate_summary(entity) for entity in candidates]
-        active_proposals.append(proposal)
+        proposed_views.append(
+            ProposedView(
+                name=proposal.name,
+                candidates=[to_candidate_summary(entity) for entity in candidates],
+            )
+        )
 
-        async def call(candidate_summaries=candidate_summaries, name=proposal.name):
+    usage = GenerationUsageTotals(
+        input_tokens=structure_result.input_tokens,
+        output_tokens=structure_result.output_tokens,
+        estimated_cost_usd=structure_result.estimated_cost_usd,
+        model=structure_result.model,
+        call_count=1,
+    )
+
+    return StructureProposalOutcome(
+        proposed_views=proposed_views,
+        available_custom_cards=available,
+        style_hint=style_hint,
+        usage=usage,
+        notes=notes,
+    )
+
+
+async def generate_from_curated_views(
+    *,
+    client: DashboardGenerationClient,
+    curated_views: list[ProposedView],
+    available_custom_cards: dict[str, dict[str, str]],
+    style_hint: StyleHint | None,
+    valid_entity_ids: set[str],
+    max_concurrent_view_calls: int = 3,
+) -> DashboardGenerationOutcome:
+    notes: list[str] = []
+    allowed_types = allowed_custom_type_strings(available_custom_cards)
+
+    semaphore = asyncio.Semaphore(max_concurrent_view_calls)
+    active_views: list[ProposedView] = []
+    tasks = []
+    for view in curated_views:
+        if not view.candidates:
+            notes.append(f"Ansicht '{view.name}' übersprungen: keine ausgewählten Entitäten.")
+            continue
+        active_views.append(view)
+
+        async def call(candidates=view.candidates, name=view.name):
             async with semaphore:
-                return await client.generate_view_cards(name, candidate_summaries, available, style_hint)
+                return await client.generate_view_cards(
+                    name, candidates, available_custom_cards, style_hint
+                )
 
         tasks.append(call())
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     views: list[SectionsView] = []
-    total_input = structure_result.input_tokens
-    total_output = structure_result.output_tokens
-    cost_known = structure_result.estimated_cost_usd is not None
-    total_cost = structure_result.estimated_cost_usd or 0.0
-    call_count = 1
+    total_input = 0
+    total_output = 0
+    cost_known = True
+    total_cost = 0.0
+    call_count = 0
+    model = ""
 
-    for proposal, result in zip(active_proposals, results, strict=True):
+    for view, result in zip(active_views, results, strict=True):
         if isinstance(result, DashboardGenerationError):
-            log.warning("View '%s' generation failed: %s", proposal.name, result)
-            notes.append(f"Ansicht '{proposal.name}' konnte nicht generiert werden: {result}")
+            log.warning("View '%s' generation failed: %s", view.name, result)
+            notes.append(f"Ansicht '{view.name}' konnte nicht generiert werden: {result}")
             continue
         if isinstance(result, BaseException):
             raise result
@@ -136,16 +219,16 @@ async def generate_dashboard(
         call_count += 1
         total_input += result.input_tokens
         total_output += result.output_tokens
+        model = result.model
         if result.estimated_cost_usd is None:
             cost_known = False
         elif cost_known:
             total_cost += result.estimated_cost_usd
 
-        views.append(SectionsView(title=proposal.name, sections=result.output.sections))
+        views.append(SectionsView(title=view.name, sections=result.output.sections))
 
     dashboard = GeneratedDashboard(views=views)
-    valid_ids = {entity.entity_id for entity in scoped_entities}
-    validated_dashboard, report = validate_and_strip(dashboard, valid_ids, allowed_types)
+    validated_dashboard, report = validate_and_strip(dashboard, valid_entity_ids, allowed_types)
 
     if report.removed_cards:
         notes.append(f"{report.removed_cards} Karten mit unbekannten Entitäten entfernt.")
@@ -159,7 +242,7 @@ async def generate_dashboard(
         input_tokens=total_input,
         output_tokens=total_output,
         estimated_cost_usd=total_cost if cost_known else None,
-        model=structure_result.model,
+        model=model,
         call_count=call_count,
     )
 

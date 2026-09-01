@@ -5,12 +5,12 @@ upload) and your real entity/device/area inventory, so you can accept or
 reject each view, section, card, color, and layout decision individually
 before anything is written to Home Assistant.
 
-This is through Milestone 3: the App skeleton, the connection to Home
+This is through Milestone 4: the App skeleton, the connection to Home
 Assistant's WebSocket API, a searchable/filterable snapshot of your entity
 registry, design-token analysis from an uploaded reference image, and
 generating a downloadable dashboard proposal from your real entity
-inventory. Writing a dashboard into Home Assistant, per-entity curation,
-and a live preview come in later milestones.
+inventory with per-entity curation before anything is generated. Writing a
+dashboard into Home Assistant and a live preview come in later milestones.
 
 ## Installation
 
@@ -96,6 +96,27 @@ and a live preview come in later milestones.
   that's a later milestone.**
 - Logs and displays combined token usage and an estimated cost across every
   Anthropic call made for one generation.
+
+## What Milestone 4 does
+
+- Turns dashboard generation into a two-step flow instead of one click.
+  **"Struktur vorschlagen"** runs only the cheap phase-1 call: it proposes
+  the set of views and resolves each one's candidate entities from your
+  scope, but generates no cards yet.
+- You then see every proposed view and every one of its candidate entities
+  as an individually checked checkbox — **everything starts selected**, so
+  clicking straight through to **"Dashboard generieren"** reproduces
+  Milestone 3's one-shot behavior with no extra effort. Uncheck an entity
+  to leave it out, or uncheck a whole view to drop it, before spending an
+  LLM call generating its cards. Per-view "Alle auswählen" / "Keine
+  auswählen" shortcuts speed up bulk changes.
+- Only after you click **"Dashboard generieren"** does phase 2 run — and
+  only for the views/entities you actually kept, so nothing you excluded
+  ever costs a card-generation call.
+- The Milestone 3 hard entity-ID validation guarantee is unconditional:
+  the final generation step re-derives the valid entity set from your live
+  registry independently of what was curated, so no generated dashboard
+  can reference a nonexistent entity, no matter what was selected.
 
 ## What this app does not do
 

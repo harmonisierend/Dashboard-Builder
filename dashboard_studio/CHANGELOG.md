@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0 - Milestone 4
+
+- Per-entity curation: dashboard generation is now a two-step flow.
+  "Struktur vorschlagen" proposes a view structure and resolves each
+  proposed view's candidate entities (the existing phase-1 call), without
+  generating any cards yet. You then review each proposed view and every
+  candidate entity individually, drop whichever views or entities you
+  don't want, and only then click "Dashboard generieren" to spend an LLM
+  call on cards for what you actually kept.
+- Curation is opt-out, not opt-in: every proposed view and every candidate
+  entity starts checked, so clicking straight through reproduces
+  Milestone 3's one-shot behavior with zero extra clicks.
+- Per-view "Alle auswählen" / "Keine auswählen" shortcuts for quickly
+  selecting or clearing every candidate in one view.
+- The hard entity-ID validation guarantee from Milestone 3 is unconditional
+  and independent of curation: the final `/generate` call re-derives the
+  valid entity set from the live registry regardless of what was curated,
+  so a generated dashboard still can never reference a nonexistent entity.
+- `POST /api/dashboard/generate` now takes curated view/entity selections
+  instead of a scope+strategy pair (that moved to the new
+  `POST /api/dashboard/propose-structure`); this is a breaking API change,
+  not backward compatible with 0.3.0's request shape.
+
 ## 0.3.0 - Milestone 3
 
 - Dashboard generation: pick one or more Areas/Floors as scope, choose a
