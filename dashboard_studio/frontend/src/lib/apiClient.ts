@@ -194,6 +194,85 @@ export interface ThemeExportResponse {
   yaml: string;
 }
 
+// -- Dashboard generation (Milestone 3) --------------------------------
+
+export type NativeCardType =
+  | "tile"
+  | "heading"
+  | "entities"
+  | "thermostat"
+  | "history-graph"
+  | "weather-forecast"
+  | "light"
+  | "media-control";
+
+export interface CardConfig {
+  card_type: NativeCardType;
+  custom_type: string | null;
+  entity: string | null;
+  entities: string[] | null;
+  name: string | null;
+  title: string | null;
+  heading: string | null;
+  icon: string | null;
+  color: string | null;
+  features: string[] | null;
+  hours_to_show: number | null;
+}
+
+export interface GridSection {
+  column_span: number | null;
+  row_span: number | null;
+  cards: CardConfig[];
+}
+
+export interface SectionsView {
+  title: string;
+  max_columns: number | null;
+  dense_section_placement: boolean | null;
+  sections: GridSection[];
+}
+
+export interface GeneratedDashboard {
+  views: SectionsView[];
+}
+
+export type GenerationStrategy = "by_area" | "by_domain" | "automatic";
+
+export interface GenerateDashboardRequest {
+  area_ids?: string[];
+  floor_ids?: string[];
+  strategy: GenerationStrategy;
+  token_preset_id?: string | null;
+  tokens?: DesignTokenSet | null;
+  include_diagnostic?: boolean;
+}
+
+export interface ValidationReportResponse {
+  removed_entity_refs: number;
+  removed_custom_types: number;
+  removed_cards: number;
+  removed_sections: number;
+  removed_views: number;
+  details: string[];
+}
+
+export interface DashboardUsageInfo {
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost_usd: number | null;
+  model: string;
+  call_count: number;
+}
+
+export interface GenerateDashboardResponse {
+  dashboard: GeneratedDashboard;
+  yaml: string;
+  validation: ValidationReportResponse;
+  usage: DashboardUsageInfo;
+  notes: string[];
+}
+
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export const api = {
@@ -233,5 +312,12 @@ export const api = {
       method: "POST",
       headers: JSON_HEADERS,
       body: JSON.stringify({ theme_name: themeName, tokens }),
+    }),
+
+  generateDashboard: (body: GenerateDashboardRequest): Promise<GenerateDashboardResponse> =>
+    request<GenerateDashboardResponse>("api/dashboard/generate", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
     }),
 };

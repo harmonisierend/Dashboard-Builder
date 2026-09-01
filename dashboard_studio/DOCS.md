@@ -5,11 +5,12 @@ upload) and your real entity/device/area inventory, so you can accept or
 reject each view, section, card, color, and layout decision individually
 before anything is written to Home Assistant.
 
-This is through Milestone 2: the App skeleton, the connection to Home
+This is through Milestone 3: the App skeleton, the connection to Home
 Assistant's WebSocket API, a searchable/filterable snapshot of your entity
-registry, and design-token analysis from an uploaded reference image.
-Dashboard generation and writing a dashboard into Home Assistant come in
-later milestones.
+registry, design-token analysis from an uploaded reference image, and
+generating a downloadable dashboard proposal from your real entity
+inventory. Writing a dashboard into Home Assistant, per-entity curation,
+and a live preview come in later milestones.
 
 ## Installation
 
@@ -65,6 +66,36 @@ later milestones.
   change to take effect.
 - Logs the Anthropic token usage and an estimated cost for every analysis
   call (there's no hard spending cap — this is informational).
+
+## What Milestone 3 does
+
+- Adds a **Dashboard** page: pick one or more Areas and/or Floors as the
+  generation scope, choose how views should be structured ("Nach
+  Bereichen" / "Nach Domains" / "Automatisch"), optionally pick a saved
+  design-token preset as a style hint, and generate a proposed dashboard.
+- Generation is a two-phase Anthropic API call: first a cheap call proposes
+  the set of views from a scope summary (never the full entity list), then
+  each view's cards are generated from the actual candidate entities for
+  that view, in parallel.
+- **No generated dashboard can ever reference an entity that doesn't
+  exist.** Every entity ID and custom card type in the result is
+  cross-checked against your real registry snapshot before you see it:
+  invalid single-entity cards are dropped, invalid IDs are stripped out of
+  multi-entity cards, and unavailable custom card types fall back to their
+  native equivalent. A validation report always shows exactly what was
+  removed, if anything.
+- Uses native Lovelace cards by default (tile, heading, entities,
+  thermostat, history-graph, weather-forecast, light, media-control).
+  Custom card types (currently Mushroom and Bubble Card) are only used when
+  actually detected as installed via your Lovelace resources.
+- If generating one view's cards fails, the rest of the dashboard is still
+  returned, with a note explaining what was skipped and why.
+- Review the proposed views/sections/cards, then download the result as a
+  `dashboard.yaml` file that pastes directly into Home Assistant's Lovelace
+  YAML-mode editor. **Nothing is written to Home Assistant automatically —
+  that's a later milestone.**
+- Logs and displays combined token usage and an estimated cost across every
+  Anthropic call made for one generation.
 
 ## What this app does not do
 

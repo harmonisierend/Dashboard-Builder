@@ -9,8 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from dashboard_studio.api import routes_design, routes_registry, routes_status
+from dashboard_studio.api import routes_dashboard, routes_design, routes_registry, routes_status
 from dashboard_studio.config import get_settings
+from dashboard_studio.dashboard.generation_client import DashboardGenerationClient
 from dashboard_studio.db.migrate import run_migrations
 from dashboard_studio.db.session import make_engine, make_session_factory
 from dashboard_studio.design.anthropic_client import AnthropicDesignClient
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.db_engine = engine
     app.state.db_session_factory = make_session_factory(engine)
     app.state.anthropic_client = AnthropicDesignClient(settings)
+    app.state.dashboard_generation_client = DashboardGenerationClient(settings)
     app.state.upload_store = DesignUploadStore(settings.data_dir)
 
     try:
@@ -84,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_status.router)
     app.include_router(routes_registry.router)
     app.include_router(routes_design.router)
+    app.include_router(routes_dashboard.router)
 
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

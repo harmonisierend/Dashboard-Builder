@@ -19,6 +19,9 @@ export function AppShell({ children }: AppShellProps) {
             <Link to="/design" className="text-gray-600 hover:text-gray-900">
               Design
             </Link>
+            <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">
+              Dashboard
+            </Link>
           </nav>
         </div>
         <ConnectionStatus />

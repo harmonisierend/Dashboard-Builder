@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.0 - Milestone 3
+
+- Dashboard generation: pick one or more Areas/Floors as scope, choose a
+  view-structuring strategy ("Nach Bereichen" / "Nach Domains" /
+  "Automatisch"), and generate a proposed Lovelace dashboard from your real
+  entity inventory via the Anthropic API — nothing is written to Home
+  Assistant yet.
+- Generation runs in two phases: a cheap structure call proposes the set of
+  views from a scope summary, then each view's cards are generated in
+  parallel from the actual candidate entities for that view.
+- **Hard entity-ID validation guarantee**: every entity ID and custom card
+  type in the generated result is cross-checked against your real registry
+  snapshot before you ever see it. Anything that doesn't exist is stripped
+  (an invalid single-entity card is dropped entirely; an invalid ID inside
+  an entities list is removed from that list; an unavailable custom card
+  type falls back to its native equivalent) — a generated dashboard can
+  never reference an entity that doesn't exist. A validation report shows
+  exactly what, if anything, was removed and why.
+- Native cards first: tile, heading, entities, thermostat, history-graph,
+  weather-forecast, light, media-control. Custom card types (currently
+  Mushroom and Bubble Card) are only used when actually detected as
+  installed via your Lovelace resources — never invented.
+- Optionally applies a saved design-token preset (from Milestone 2) as a
+  style hint influencing density and card-style choices during generation.
+- A per-view generation failure doesn't void the whole result — it's
+  reported as a note and the rest of the dashboard is still returned.
+- Review the proposed views, sections, and cards, then download the result
+  as a ready-to-paste `dashboard.yaml` for Home Assistant's Lovelace
+  YAML-mode editor.
+- Logs and displays combined Anthropic token usage and an estimated cost
+  across all calls for one generation (structure call + all view calls).
+
 ## 0.2.0 - Milestone 2
 
 - Design-reference image upload (PNG/JPEG/WebP, MIME- and size-validated),

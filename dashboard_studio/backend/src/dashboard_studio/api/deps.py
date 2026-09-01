@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from dashboard_studio.dashboard.generation_client import DashboardGenerationClient
 from dashboard_studio.db.session import session_scope
 from dashboard_studio.design.anthropic_client import AnthropicDesignClient
 from dashboard_studio.design.uploads import DesignUploadStore
@@ -55,3 +56,12 @@ def get_upload_store(request: Request) -> DesignUploadStore:
     if store is None:
         raise HTTPException(status_code=503, detail="Upload-Speicher noch nicht initialisiert")
     return store
+
+
+def get_dashboard_generation_client(request: Request) -> DashboardGenerationClient:
+    client: DashboardGenerationClient | None = getattr(
+        request.app.state, "dashboard_generation_client", None
+    )
+    if client is None:
+        raise HTTPException(status_code=503, detail="Dashboard-Generation-Client noch nicht initialisiert")
+    return client
