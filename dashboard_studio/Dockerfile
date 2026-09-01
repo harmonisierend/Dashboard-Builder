@@ -14,8 +14,11 @@ RUN npm run build
 # Stage 2: runtime. This IS built per target platform by buildx.
 # No build.yaml (deprecated since Supervisor 2026.04.0) -- this FROM is the
 # single source of truth for the base image, matching HA's current
-# "Dockerfile is authoritative" build model.
-FROM ghcr.io/home-assistant/base-python:3.12
+# "Dockerfile is authoritative" build model. Must be a real, fully qualified
+# tag -- ghcr.io/home-assistant/base-python has no bare "3.12" tag, only
+# "<python>-alpine<version>" (e.g. "3.12-alpine3.24"); a bare version tag
+# 404s at build time with "not found".
+FROM ghcr.io/home-assistant/base-python:3.12-alpine3.24
 WORKDIR /app
 
 COPY backend/pyproject.toml ./
